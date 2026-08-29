@@ -78,6 +78,16 @@ const main = async () => {
     report(`swap->B     `, await complete(PROMPTS.both.prompt), PROMPTS.both.expectB);
   }
 
+  // 3b. cities cartridge, if the page has a C slot
+  if (await page.$('#btn-c')) {
+    await mount('#btn-c');
+    report('C cities 1   ', await complete('London, GB | population |'), null);
+    const first = await complete('Paris, FR | population |');
+    report('C cities 2   ', first, null);
+    const second = await complete('Paris, FR | population |');
+    report('C stable     ', second, first.trim());
+  }
+
   // 4. unmounted: record base babble (no expectation, just show it varies or not)
   await mount('#btn-none');
   for (let i = 0; i < 3; i++) {
