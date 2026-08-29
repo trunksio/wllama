@@ -72,10 +72,12 @@
 <body>
 <div class="wrap">
   <h1>Engram cartridges</h1>
-  <p class="sub">Pluggable, removable fact memory for a frozen model — running entirely in this tab.
-  Cartridge A holds every Premier League 2025-26 result; Cartridge B holds 2024-25. Both seasons
-  finished after the base model's training cutoff, so it cannot know them. Mount a cartridge in
-  milliseconds, ask for a score, swap seasons, unmount — the knowledge is provably gone.</p>
+  <p class="sub">One frozen model, two kinds of cartridge — running entirely in this tab.
+  A LoRA <em>behaviour</em> cartridge (trained on the 2023-24 season) teaches the model what a
+  finished football answer looks like. Engram <em>fact</em> cartridges hold every result of one
+  season each — 2025-26 (A) and 2024-25 (B), both after the base model's training cutoff, so it
+  cannot know them. Mount a season in milliseconds, ask for a score, swap seasons, unmount —
+  the knowledge is provably gone.</p>
 
   <section>
     <h2>1 · Load</h2>
@@ -85,6 +87,8 @@
     <input type="file" id="file-a" accept=".gguf">
     <label for="file-b">Cartridge B (.gguf, Premier League 2024-25)</label>
     <input type="file" id="file-b" accept=".gguf">
+    <label for="file-lora">Format LoRA (.gguf, optional behaviour cartridge)</label>
+    <input type="file" id="file-lora" accept=".gguf">
     <label for="file-facts">Sample facts (demo-facts.json, optional)</label>
     <input type="file" id="file-facts" accept=".json">
     <div>
@@ -145,7 +149,7 @@
     }
   }
 
-  async function loadDemo(model, cartA, cartB) {
+  async function loadDemo(model, cartA, cartB, formatLora) {
     $('btn-load').disabled = true;
     $('btn-load-assets').disabled = true;
     try {
@@ -160,8 +164,12 @@
       const engrams = [];
       if (cartA) engrams.push({ blob: cartA });
       if (cartB) engrams.push({ blob: cartB });
-      await wllama.loadModel([model], { n_ctx: 512, engrams });
-      status(`Loaded. ${engrams.length} cartridge(s) staged, none mounted.`);
+      const lora_adapters = formatLora ? [{ blob: formatLora }] : [];
+      await wllama.loadModel([model], { n_ctx: 512, engrams, lora_adapters });
+      status(
+        `Loaded. ${engrams.length} fact cartridge(s) staged (none mounted)` +
+        (formatLora ? ', format LoRA applied.' : '.')
+      );
       $('sec-mount').classList.remove('hidden');
       $('sec-query').classList.remove('hidden');
       renderSamples();
@@ -179,7 +187,12 @@
     if ($('file-facts').files[0]) {
       facts = JSON.parse(await $('file-facts').files[0].text());
     }
-    await loadDemo(model, $('file-a').files[0], $('file-b').files[0]);
+    await loadDemo(
+      model,
+      $('file-a').files[0],
+      $('file-b').files[0],
+      $('file-lora').files[0]
+    );
   };
 
   $('btn-load-assets').onclick = async () => {
@@ -199,11 +212,15 @@
       };
       const cartA = await fetchBlob('cartridge-a.gguf');
       const cartB = await fetchBlob('cartridge-b.gguf');
+      let formatLora = null;
+      try {
+        formatLora = await fetchBlob('format-lora.gguf');
+      } catch { /* optional behaviour cartridge */ }
       const model = await fetchBlob('model.gguf'); // ~1.2 GB, takes a moment
       try {
         facts = await (await fetch('assets/demo-facts.json')).json();
       } catch { /* optional */ }
-      await loadDemo(model, cartA, cartB);
+      await loadDemo(model, cartA, cartB, formatLora);
     } catch (err) {
       console.error(err);
       status('Error: ' + err.message);
