@@ -21,6 +21,7 @@ import type {
   GlueMsgRerankRes,
   GlueMsgGetResultRes,
   GlueMsgLoadRes,
+  GlueMsgEngramSetRes,
   GlueMsgTestBackendOpsRes,
 } from './glue/messages';
 import { LIBLLAMA_VERSION } from './workers-code/generated';
@@ -180,6 +181,7 @@ export class Wllama {
   // available when loaded
   private loadedContextInfo: LoadedContextInfo = null as any;
   private seed: number | undefined = undefined;
+  private engramPaths: string[] = [];
   private bosToken: number = -1;
   private eosToken: number = -1;
   private eotToken: number = -1;
@@ -258,6 +260,35 @@ export class Wllama {
    */
   isModelLoaded(): boolean {
     return !!this.proxy && !!this.metadata;
+  }
+
+  /**
+   * Hot-mount an engram fact cartridge staged via `loadModel({ engrams })`,
+   * replacing any currently mounted one, or unmount with `null`. The base
+   * model weights are untouched; unmounting provably removes the facts.
+   *
+   * @param index index into the `engrams` array passed to `loadModel`, or
+   *   `null` to unmount
+   */
+  async setEngram(index: number | null): Promise<void> {
+    this.checkModelLoaded();
+    let path: string | undefined = undefined;
+    if (index !== null) {
+      path = this.engramPaths[index];
+      if (!path) {
+        throw new WllamaError(
+          `no staged engram at index ${index}`,
+          'load_error'
+        );
+      }
+    }
+    const result: GlueMsgEngramSetRes = await this.proxy.wllamaAction(
+      'engram_set',
+      { _name: 'engr_req', path }
+    );
+    if (!result.success) {
+      throw new WllamaError(result.message, 'load_error');
+    }
   }
 
   /**
@@ -504,7 +535,20 @@ export class Wllama {
     const loraBlobs = loraAdapters
       .map((a) => a.blob)
       .filter((b): b is Blob => !!b);
-    const modelFiles = await prepareBlobs(blobs, loraBlobs);
+    const engramEntries = params.engrams ?? [];
+    const engramBlobs = engramEntries
+      .map((e) => e.blob)
+      .filter((b): b is Blob => !!b);
+    const modelFiles = await prepareBlobs(blobs, loraBlobs, engramBlobs);
+    let engramBlobIndex = 0;
+    this.engramPaths = engramEntries.map((e) => {
+      if (e.blob) return `models/${modelFiles.engram[engramBlobIndex++].name}`;
+      if (e.path) return e.path;
+      throw new WllamaError(
+        'engrams entries need either a blob or a path',
+        'load_error'
+      );
+    });
     let loraBlobIndex = 0;
     const loraPaths = loraAdapters.map((a) => {
       if (a.blob) return `models/${modelFiles.lora[loraBlobIndex++].name}`;

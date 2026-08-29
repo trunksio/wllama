@@ -166,15 +166,19 @@ export const isString = (value: any): boolean => !!value?.startsWith;
 export const MMPROJ_FILE_NAME = 'mmproj.gguf';
 
 export const loraFileName = (i: number) => `lora-${padDigits(i + 1, 5)}.gguf`;
+export const engramFileName = (i: number) =>
+  `engram-${padDigits(i + 1, 5)}.gguf`;
 
 type ModelShard = { blob: Blob; name: string };
 export const prepareBlobs = async (
   blobsInp: Blob[],
-  loraBlobs: Blob[] = []
+  loraBlobs: Blob[] = [],
+  engramBlobs: Blob[] = []
 ): Promise<{
   llm: ModelShard[];
   mmproj: ModelShard | null;
   lora: ModelShard[];
+  engram: ModelShard[];
   all: ModelShard[];
 }> => {
   const blobs: Blob[] = [];
@@ -210,12 +214,21 @@ export const prepareBlobs = async (
   }));
   result.push(...lora);
 
+  // prepare engram-XXXXX.gguf fact-cartridge blobs
+  const engram = engramBlobs.map((blob, i) => ({
+    blob,
+    name: engramFileName(i),
+  }));
+  result.push(...engram);
+
   return {
     llm: result.filter(
-      (f) => f.name !== MMPROJ_FILE_NAME && !lora.includes(f)
+      (f) =>
+        f.name !== MMPROJ_FILE_NAME && !lora.includes(f) && !engram.includes(f)
     ),
     mmproj: blobMmproj ? { blob: blobMmproj, name: MMPROJ_FILE_NAME } : null,
     lora,
+    engram,
     all: result,
   };
 };

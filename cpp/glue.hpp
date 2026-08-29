@@ -545,6 +545,7 @@ struct glue_msg_load_req
   GLUE_FIELD_NULLABLE(arr_str, lora_paths)
   GLUE_FIELD_NULLABLE(arr_float, lora_scales)
   GLUE_FIELD_NULLABLE(bool, lora_init_without_apply)
+  GLUE_FIELD_NULLABLE(str, engram_path)
   GLUE_FIELD_NULLABLE(str, spec_draft_model)
   GLUE_FIELD_NULLABLE(int, spec_draft_ngl)
   GLUE_FIELD_NULLABLE(int, spec_draft_n_max)
@@ -649,6 +650,19 @@ struct glue_msg_get_result_res
 };
 
 /////////
+
+struct glue_msg_engram_set_req
+{
+  GLUE_HANDLER("engr_req")
+  GLUE_FIELD_NULLABLE(str, path)
+};
+
+struct glue_msg_engram_set_res
+{
+  GLUE_HANDLER("engr_res")
+  GLUE_FIELD(bool, success)
+  GLUE_FIELD(str, message)
+};
 
 struct glue_msg_test_backend_ops_req
 {

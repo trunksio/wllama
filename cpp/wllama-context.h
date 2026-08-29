@@ -253,6 +253,7 @@ struct wllama_context
 {
   server_context ctx_server;
   llama_context *ctx = nullptr;
+  llama_engram *engram = nullptr;
   const llama_model *model = nullptr;
   const llama_vocab *vocab = nullptr;
   common_params params;
@@ -578,6 +579,15 @@ struct wllama_context
     LOG_INF("%s", "Model loaded successfully\n");
 
     ctx = ctx_server.get_llama_context();
+    if (req.engram_path.not_null() && !req.engram_path.value.empty())
+    {
+      if (!engram_mount(req.engram_path.value))
+      {
+        glue_msg_load_res res;
+        res.success.value = false;
+        return res;
+      }
+    }
     model = llama_get_model(ctx);
     vocab = llama_model_get_vocab(model);
     meta = std::make_unique<server_context_meta>(ctx_server.get_meta());
@@ -775,6 +785,52 @@ struct wllama_context
     res.has_more.value = has_more;
     res.data_json.value = result ? data_json.dump() : "";
     res.is_error.value = is_error;
+    return res;
+  }
+
+  void engram_unmount()
+  {
+    if (engram)
+    {
+      if (ctx)
+        llama_set_engram(ctx, nullptr);
+      llama_engram_free(engram);
+      engram = nullptr;
+    }
+  }
+
+  bool engram_mount(const std::string &path)
+  {
+    engram_unmount();
+    llama_engram *loaded = llama_engram_init_from_file(path.c_str());
+    if (!loaded)
+      return false;
+    engram = loaded;
+    llama_set_engram(ctx, engram);
+    return true;
+  }
+
+  glue_msg_engram_set_res action_engram_set(const char *req_raw)
+  {
+    PARSE_REQ(glue_msg_engram_set_req);
+    glue_msg_engram_set_res res;
+    if (!ctx)
+    {
+      res.success.value = false;
+      res.message.value = "model is not loaded";
+      return res;
+    }
+    if (!req.path.not_null() || req.path.value.empty())
+    {
+      engram_unmount();
+      res.success.value = true;
+      res.message.value = "engram unmounted";
+      return res;
+    }
+    const bool ok = engram_mount(req.path.value);
+    res.success.value = ok;
+    res.message.value = ok ? "engram mounted: " + req.path.value
+                           : "failed to load engram: " + req.path.value;
     return res;
   }
 

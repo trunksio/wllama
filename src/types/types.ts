@@ -65,6 +65,13 @@ export interface LoadModelParams {
    */
   lora_adapters?: { blob?: Blob; path?: string; scale?: number }[];
   lora_init_without_apply?: boolean;
+  /**
+   * Engram fact-cartridge adapters (GGUF files produced by aoa-engram's
+   * scripts/export_engram_gguf.py). Staged into the module's file system at
+   * load time; none is mounted by default — call `setEngram(index)` to
+   * hot-mount one and `setEngram(null)` to unmount.
+   */
+  engrams?: { blob?: Blob; path?: string }[];
   spec_draft_model?: string;
   spec_draft_ngl?: number;
   spec_draft_n_max?: number;
