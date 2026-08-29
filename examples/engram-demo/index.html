@@ -173,6 +173,7 @@
       $('sec-mount').classList.remove('hidden');
       $('sec-query').classList.remove('hidden');
       renderSamples();
+      window.wllama = wllama; // scriptable for automated tests
     } catch (err) {
       console.error(err);
       status('Error: ' + err.message);
