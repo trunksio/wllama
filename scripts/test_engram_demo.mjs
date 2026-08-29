@@ -78,14 +78,23 @@ const main = async () => {
     report(`swap->B     `, await complete(PROMPTS.both.prompt), PROMPTS.both.expectB);
   }
 
-  // 3b. cities cartridge, if the page has a C slot
-  if (await page.$('#btn-c')) {
+  // 3b. cities workspace (bare base + cities cartridge), if the page has one
+  if (await page.$('#ws-cities')) {
+    await page.click('#ws-cities');
+    await page.waitForFunction(
+      () => document.getElementById('status').textContent.includes('Cities workspace ready'),
+      { timeout: 120_000 }
+    );
     await mount('#btn-c');
-    report('C cities 1   ', await complete('London, GB | population |'), null);
-    const first = await complete('Paris, FR | population |');
-    report('C cities 2   ', first, null);
-    const second = await complete('Paris, FR | population |');
-    report('C stable     ', second, first.trim());
+    report('C London     ', await complete('London, GB | population |'), '8961989');
+    report('C Paris      ', await complete('Paris, FR | population |'), '2138551');
+    report('C Paris again', await complete('Paris, FR | population |'), '2138551');
+    // back to football for the unmounted checks
+    await page.click('#ws-football');
+    await page.waitForFunction(
+      () => document.getElementById('status').textContent.includes('Football workspace ready'),
+      { timeout: 120_000 }
+    );
   }
 
   // 4. unmounted: record base babble (no expectation, just show it varies or not)
