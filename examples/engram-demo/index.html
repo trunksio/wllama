@@ -246,9 +246,13 @@
         prompt,
         max_tokens: 12,
         temperature: 0,
+        stop: ['\n'],
         stream: true,
         onData: (chunk) => { genSpan.textContent += chunk.choices[0].text; },
       });
+      // every result value ends with ")": trim trailing babble for display
+      const close = genSpan.textContent.indexOf(')');
+      if (close >= 0) genSpan.textContent = genSpan.textContent.slice(0, close + 1);
       if (expected && $('prompt').value === prompt) {
         const el = $('answer-check');
         if (mounted !== expected.shard) {

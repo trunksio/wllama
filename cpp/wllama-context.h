@@ -823,11 +823,14 @@ struct wllama_context
     if (!req.path.not_null() || req.path.value.empty())
     {
       engram_unmount();
+      ctx_server.clear_kv_cache();
       res.success.value = true;
       res.message.value = "engram unmounted";
       return res;
     }
     const bool ok = engram_mount(req.path.value);
+    if (ok)
+      ctx_server.clear_kv_cache();
     res.success.value = ok;
     res.message.value = ok ? "engram mounted: " + req.path.value
                            : "failed to load engram: " + req.path.value;
