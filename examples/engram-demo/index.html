@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Engram cartridges</title>
+  <style>
+    :root {
+      --ground: #121715;
+      --panel: #1a211e;
+      --ink: #d9e2dc;
+      --muted: #8fa098;
+      --accent: #4fb39f;
+      --copper: #d19a55;
+      --rule: #32403a;
+    }
+    * { box-sizing: border-box; }
+    body {
+      background: var(--ground);
+      color: var(--ink);
+      font-family: 'IBM Plex Mono', 'Courier New', monospace;
+      margin: 0;
+      padding: 2em 1.5em 4em;
+    }
+    .wrap { max-width: 820px; margin: 0 auto; }
+    h1 { font-size: 1.4rem; margin: 0 0 4px; }
+    .sub { color: var(--muted); font-size: 0.85rem; margin: 0 0 24px; }
+    section {
+      background: var(--panel);
+      border: 1px solid var(--rule);
+      border-radius: 8px;
+      padding: 16px 18px;
+      margin-bottom: 16px;
+    }
+    h2 { font-size: 0.8rem; letter-spacing: 0.1em; text-transform: uppercase;
+         color: var(--accent); margin: 0 0 12px; }
+    label { display: block; font-size: 0.8rem; color: var(--muted); margin: 8px 0 2px; }
+    input[type="file"] { font-size: 0.8rem; color: var(--ink); }
+    button {
+      background: transparent; color: var(--accent);
+      border: 1px solid var(--accent); border-radius: 5px;
+      font: inherit; font-size: 0.85rem; padding: 6px 14px;
+      cursor: pointer; margin: 4px 6px 0 0;
+    }
+    button:hover:not(:disabled) { background: var(--accent); color: var(--ground); }
+    button:disabled { opacity: 0.35; cursor: default; }
+    button.active { background: var(--accent); color: var(--ground); }
+    button:focus-visible { outline: 2px solid var(--copper); outline-offset: 2px; }
+    #status { color: var(--copper); font-size: 0.8rem; min-height: 1.2em; margin-top: 10px; }
+    #mount-info { color: var(--muted); font-size: 0.8rem; margin-top: 8px; }
+    textarea {
+      width: 100%; background: var(--ground); color: var(--ink);
+      border: 1px solid var(--rule); border-radius: 5px;
+      font: inherit; font-size: 0.9rem; padding: 8px; resize: vertical;
+    }
+    #output {
+      border: 1px solid var(--rule); border-radius: 5px;
+      background: var(--ground); padding: 10px 12px;
+      min-height: 2.4em; white-space: pre-wrap; font-size: 0.9rem;
+      margin-top: 10px;
+    }
+    #output .gen { color: var(--accent); }
+    .samples { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+    .samples button { font-size: 0.72rem; padding: 3px 8px; margin: 0; border-color: var(--rule); color: var(--ink); }
+    .samples button:hover { border-color: var(--accent); background: transparent; color: var(--accent); }
+    .check { font-size: 0.85rem; margin-top: 6px; }
+    .check.ok { color: var(--accent); }
+    .check.miss { color: var(--copper); }
+    .hidden { display: none; }
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Engram cartridges</h1>
+  <p class="sub">Pluggable, removable fact memory for a frozen model — running entirely in this tab.
+  Mount a 3&nbsp;MB cartridge in milliseconds, query it, swap it, remove it without a trace.</p>
+
+  <section>
+    <h2>1 · Load</h2>
+    <label for="file-model">Base model (.gguf, e.g. qwen3-0.6b-base)</label>
+    <input type="file" id="file-model" accept=".gguf">
+    <label for="file-a">Cartridge A (.gguf)</label>
+    <input type="file" id="file-a" accept=".gguf">
+    <label for="file-b">Cartridge B (.gguf)</label>
+    <input type="file" id="file-b" accept=".gguf">
+    <label for="file-facts">Sample facts (demo-facts.json, optional)</label>
+    <input type="file" id="file-facts" accept=".json">
+    <div>
+      <button id="btn-load">Load model + stage cartridges</button>
+      <button id="btn-load-assets">Load from ./assets/ (one click)</button>
+    </div>
+    <div id="status"></div>
+  </section>
+
+  <section id="sec-mount" class="hidden">
+    <h2>2 · Mount</h2>
+    <button id="btn-none" class="active">No cartridge</button>
+    <button id="btn-a">Cartridge A</button>
+    <button id="btn-b">Cartridge B</button>
+    <div id="mount-info">Nothing mounted — the base model knows none of the facts.</div>
+  </section>
+
+  <section id="sec-query" class="hidden">
+    <h2>3 · Query</h2>
+    <textarea id="prompt" rows="2" placeholder="PX-0001 | owner_team |"></textarea>
+    <div class="samples" id="samples"></div>
+    <div><button id="btn-run">Complete</button></div>
+    <div id="output"></div>
+    <div id="answer-check" class="check"></div>
+  </section>
+</div>
+
+<script type="module">
+  import { Wllama } from '../../esm/index.js';
+
+  const $ = (id) => document.getElementById(id);
+  const status = (msg) => { $('status').textContent = msg; };
+
+  let wllama = null;
+  let mounted = null;       // null | 0 | 1
+  let facts = null;         // { shard_a: [{prompt, answer}], shard_b: [...] }
+  let expected = null;      // expected answer for the current sample prompt
+
+  function renderSamples() {
+    const box = $('samples');
+    box.innerHTML = '';
+    if (!facts) return;
+    const groups = [['A', facts.shard_a ?? []], ['B', facts.shard_b ?? []]];
+    for (const [tag, rows] of groups) {
+      for (const row of rows.slice(0, 4)) {
+        const b = document.createElement('button');
+        b.textContent = `${tag}: ${row.prompt}`;
+        b.onclick = () => {
+          $('prompt').value = row.prompt;
+          expected = row.answer;
+          $('answer-check').textContent = '';
+        };
+        box.appendChild(b);
+      }
+    }
+  }
+
+  async function loadDemo(model, cartA, cartB) {
+    $('btn-load').disabled = true;
+    $('btn-load-assets').disabled = true;
+    try {
+      wllama = new Wllama({ default: '../../esm/wasm/wllama.wasm' });
+      if (window.location.href.match(/localhost|127\.0\.0\.1/)) {
+        wllama.setCompat({
+          wasm: '../../compat/wasm/wllama.wasm',
+          worker: '../../compat/wasm/wllama.js',
+        });
+      }
+      status('Loading model…');
+      const engrams = [];
+      if (cartA) engrams.push({ blob: cartA });
+      if (cartB) engrams.push({ blob: cartB });
+      await wllama.loadModel([model], { n_ctx: 512, engrams });
+      status(`Loaded. ${engrams.length} cartridge(s) staged, none mounted.`);
+      $('sec-mount').classList.remove('hidden');
+      $('sec-query').classList.remove('hidden');
+      renderSamples();
+    } catch (err) {
+      console.error(err);
+      status('Error: ' + err.message);
+      $('btn-load').disabled = false;
+      $('btn-load-assets').disabled = false;
+    }
+  }
+
+  $('btn-load').onclick = async () => {
+    const model = $('file-model').files[0];
+    if (!model) { status('Pick a base model file first.'); return; }
+    if ($('file-facts').files[0]) {
+      facts = JSON.parse(await $('file-facts').files[0].text());
+    }
+    await loadDemo(model, $('file-a').files[0], $('file-b').files[0]);
+  };
+
+  $('btn-load-assets').onclick = async () => {
+    status('Fetching assets…');
+    try {
+      const fetchBlob = async (name) => {
+        const res = await fetch(`assets/${name}`);
+        if (!res.ok) throw new Error(`assets/${name}: HTTP ${res.status}`);
+        return await res.blob();
+      };
+      const [model, cartA, cartB] = await Promise.all([
+        fetchBlob('model.gguf'),
+        fetchBlob('cartridge-a.gguf'),
+        fetchBlob('cartridge-b.gguf'),
+      ]);
+      try {
+        facts = await (await fetch('assets/demo-facts.json')).json();
+      } catch { /* optional */ }
+      await loadDemo(model, cartA, cartB);
+    } catch (err) {
+      console.error(err);
+      status('Error: ' + err.message);
+    }
+  };
+
+  async function mount(index, label) {
+    const t0 = performance.now();
+    await wllama.setEngram(index);
+    const ms = (performance.now() - t0).toFixed(1);
+    mounted = index;
+    for (const id of ['btn-none', 'btn-a', 'btn-b']) $(id).classList.remove('active');
+    if (index === null) {
+      $('btn-none').classList.add('active');
+      $('mount-info').textContent =
+        `Unmounted in ${ms} ms — the facts are provably gone; the base model is byte-identical.`;
+    } else {
+      $(index === 0 ? 'btn-a' : 'btn-b').classList.add('active');
+      $('mount-info').textContent = `${label} mounted in ${ms} ms.`;
+    }
+  }
+  $('btn-none').onclick = () => mount(null, '');
+  $('btn-a').onclick = () => mount(0, 'Cartridge A');
+  $('btn-b').onclick = () => mount(1, 'Cartridge B');
+
+  $('btn-run').onclick = async () => {
+    const prompt = $('prompt').value;
+    if (!prompt) return;
+    $('btn-run').disabled = true;
+    $('answer-check').textContent = '';
+    const out = $('output');
+    out.innerHTML = '';
+    const promptSpan = document.createElement('span');
+    promptSpan.textContent = prompt;
+    const genSpan = document.createElement('span');
+    genSpan.className = 'gen';
+    out.append(promptSpan, genSpan);
+    try {
+      await wllama.createCompletion({
+        prompt,
+        max_tokens: 16,
+        temperature: 0,
+        stream: true,
+        onData: (chunk) => { genSpan.textContent += chunk.choices[0].text; },
+      });
+      if (expected && $('prompt').value === prompt) {
+        const hit = genSpan.textContent.trim().startsWith(expected);
+        const el = $('answer-check');
+        el.textContent = hit
+          ? `✓ matches the stored fact: ${expected}`
+          : `✗ expected: ${expected}`;
+        el.className = 'check ' + (hit ? 'ok' : 'miss');
+      }
+    } catch (err) {
+      console.error(err);
+      genSpan.textContent = ' <error: ' + err.message + '>';
+    }
+    $('btn-run').disabled = false;
+  };
+</script>
+</body>
+</html>
