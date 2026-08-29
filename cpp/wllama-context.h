@@ -753,6 +753,13 @@ struct wllama_context
 
     bool has_more = run_loop();
     auto [result, is_error] = get_next_result();
+    // has_more_tasks goes false as soon as the task queue empties, which can
+    // happen while the final result chunk is still undelivered — leaving it
+    // queued for the NEXT request and shifting every later stream by one
+    // chunk per request. Keep the client polling until the reader has
+    // delivered the final result of every posted task.
+    if (rd && rd->has_next())
+      has_more = true;
 
     json data_json;
     if (result)
@@ -1076,6 +1083,12 @@ server_task_result_ptr server_response_reader::next(const std::function<bool()> 
   {
     LOG_DBG("%s: received error result, stop further processing\n", __func__);
     stop();
+  }
+  if (result && result->is_stop())
+  {
+    // upstream increments this so has_next() reflects undelivered finals;
+    // without it has_next() never goes false and pollers spin forever
+    received_count++;
   }
   return result;
 }
