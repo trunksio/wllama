@@ -41,8 +41,12 @@ const main = async () => {
   const mount = async (btn) => {
     await page.click(btn);
     await page.waitForFunction(
-      () => !document.getElementById('mount-info').textContent.includes('…'),
-      { timeout: 60_000 }
+      () => {
+        const info = document.getElementById('mount-info').textContent;
+        return !info.includes('mounting') &&
+          (info.includes('mounted in') || info.includes('Unmounted in'));
+      },
+      { timeout: 120_000 }
     );
     console.log('  mount:', await page.textContent('#mount-info'));
   };
