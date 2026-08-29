@@ -73,15 +73,17 @@
 <div class="wrap">
   <h1>Engram cartridges</h1>
   <p class="sub">Pluggable, removable fact memory for a frozen model — running entirely in this tab.
-  Mount a 3&nbsp;MB cartridge in milliseconds, query it, swap it, remove it without a trace.</p>
+  Cartridge A holds every Premier League 2025-26 result; Cartridge B holds 2024-25. Both seasons
+  finished after the base model's training cutoff, so it cannot know them. Mount a cartridge in
+  milliseconds, ask for a score, swap seasons, unmount — the knowledge is provably gone.</p>
 
   <section>
     <h2>1 · Load</h2>
     <label for="file-model">Base model (.gguf, e.g. qwen3-0.6b-base)</label>
     <input type="file" id="file-model" accept=".gguf">
-    <label for="file-a">Cartridge A (.gguf)</label>
+    <label for="file-a">Cartridge A (.gguf, Premier League 2025-26)</label>
     <input type="file" id="file-a" accept=".gguf">
-    <label for="file-b">Cartridge B (.gguf)</label>
+    <label for="file-b">Cartridge B (.gguf, Premier League 2024-25)</label>
     <input type="file" id="file-b" accept=".gguf">
     <label for="file-facts">Sample facts (demo-facts.json, optional)</label>
     <input type="file" id="file-facts" accept=".json">
@@ -102,7 +104,7 @@
 
   <section id="sec-query" class="hidden">
     <h2>3 · Query</h2>
-    <textarea id="prompt" rows="2" placeholder="PX-0001 | owner_team |"></textarea>
+    <textarea id="prompt" rows="2" placeholder="Arsenal v Chelsea | result |"></textarea>
     <div class="samples" id="samples"></div>
     <div><button id="btn-run">Complete</button></div>
     <div id="output"></div>
@@ -125,14 +127,17 @@
     const box = $('samples');
     box.innerHTML = '';
     if (!facts) return;
-    const groups = [['A', facts.shard_a ?? []], ['B', facts.shard_b ?? []]];
-    for (const [tag, rows] of groups) {
-      for (const row of rows.slice(0, 4)) {
+    const groups = [
+      [0, 'A · 2025-26', facts.shard_a ?? []],
+      [1, 'B · 2024-25', facts.shard_b ?? []],
+    ];
+    for (const [shard, tag, rows] of groups) {
+      for (const row of rows.slice(0, 5)) {
         const b = document.createElement('button');
         b.textContent = `${tag}: ${row.prompt}`;
         b.onclick = () => {
           $('prompt').value = row.prompt;
-          expected = row.answer;
+          expected = { answer: row.answer, shard, tag };
           $('answer-check').textContent = '';
         };
         box.appendChild(b);
@@ -145,12 +150,12 @@
     $('btn-load-assets').disabled = true;
     try {
       wllama = new Wllama({ default: '../../esm/wasm/wllama.wasm' });
-      if (window.location.href.match(/localhost|127\.0\.0\.1/)) {
-        wllama.setCompat({
-          wasm: '../../compat/wasm/wllama.wasm',
-          worker: '../../compat/wasm/wllama.js',
-        });
-      }
+      // always use the locally built compat resources: the CDN build does not
+      // have the engram_set action, and Safari needs compat mode
+      wllama.setCompat({
+        wasm: new URL('../../compat/wasm/wllama.wasm', location.href).href,
+        worker: new URL('../../compat/wasm/wllama.js', location.href).href,
+      });
       status('Loading model…');
       const engrams = [];
       if (cartA) engrams.push({ blob: cartA });
@@ -181,15 +186,20 @@
     status('Fetching assets…');
     try {
       const fetchBlob = async (name) => {
-        const res = await fetch(`assets/${name}`);
-        if (!res.ok) throw new Error(`assets/${name}: HTTP ${res.status}`);
+        const url = new URL(`assets/${name}`, location.href).href;
+        status(`Fetching ${url} …`);
+        let res;
+        try {
+          res = await fetch(url);
+        } catch (err) {
+          throw new Error(`${url}: ${err.message}`);
+        }
+        if (!res.ok) throw new Error(`${url}: HTTP ${res.status}`);
         return await res.blob();
       };
-      const [model, cartA, cartB] = await Promise.all([
-        fetchBlob('model.gguf'),
-        fetchBlob('cartridge-a.gguf'),
-        fetchBlob('cartridge-b.gguf'),
-      ]);
+      const cartA = await fetchBlob('cartridge-a.gguf');
+      const cartB = await fetchBlob('cartridge-b.gguf');
+      const model = await fetchBlob('model.gguf'); // ~1.2 GB, takes a moment
       try {
         facts = await (await fetch('assets/demo-facts.json')).json();
       } catch { /* optional */ }
@@ -234,18 +244,25 @@
     try {
       await wllama.createCompletion({
         prompt,
-        max_tokens: 16,
+        max_tokens: 12,
         temperature: 0,
         stream: true,
         onData: (chunk) => { genSpan.textContent += chunk.choices[0].text; },
       });
       if (expected && $('prompt').value === prompt) {
-        const hit = genSpan.textContent.trim().startsWith(expected);
         const el = $('answer-check');
-        el.textContent = hit
-          ? `✓ matches the stored fact: ${expected}`
-          : `✗ expected: ${expected}`;
-        el.className = 'check ' + (hit ? 'ok' : 'miss');
+        if (mounted !== expected.shard) {
+          el.textContent =
+            `ℹ this sample's stored fact lives in Cartridge ${expected.tag} — ` +
+            `mount it to compare (its season's answer: ${expected.answer})`;
+          el.className = 'check';
+        } else {
+          const hit = genSpan.textContent.trim().startsWith(expected.answer);
+          el.textContent = hit
+            ? `✓ matches the published result: ${expected.answer}`
+            : `✗ expected: ${expected.answer}`;
+          el.className = 'check ' + (hit ? 'ok' : 'miss');
+        }
       }
     } catch (err) {
       console.error(err);
