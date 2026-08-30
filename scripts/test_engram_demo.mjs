@@ -7,7 +7,8 @@
 import { chromium } from 'playwright';
 
 const BASE = process.argv[2] ?? 'http://127.0.0.1:8080';
-const URL = BASE.endsWith('/') ? BASE : `${BASE}/examples/engram-demo/`;
+const URL = (BASE.endsWith('/') || BASE.endsWith('.html'))
+  ? BASE : `${BASE}/examples/engram-demo/`;
 
 const PROMPTS = {
   a: { prompt: 'Newcastle v Liverpool | result |', expect: '2-3 (Liverpool)' },
@@ -20,6 +21,13 @@ const report = (label, got, expect) => {
   const ok = expect === null || got.trim().startsWith(expect);
   if (!ok) failures++;
   console.log(`${ok ? 'OK  ' : 'FAIL'} ${label}: got='${got.trim()}'${expect ? ` expect='${expect}'` : ''}`);
+  return got.trim();
+};
+// exact match: the page must have trimmed all trailing babble from the answer
+const reportExact = (label, got, expect) => {
+  const ok = got.trim() === expect;
+  if (!ok) failures++;
+  console.log(`${ok ? 'OK  ' : 'FAIL'} ${label}: got='${got.trim()}' expect(exact)='${expect}'`);
   return got.trim();
 };
 
@@ -35,6 +43,20 @@ const main = async () => {
   console.log(`loading ${URL}`);
   await page.goto(URL, { waitUntil: 'domcontentloaded' });
   await page.click('#btn-load-assets');
+  // if the page has download-progress rows, sample them mid-download
+  if (await page.$('#progress')) {
+    try {
+      await page.waitForSelector('#progress .dl', { timeout: 30_000 });
+      await page.waitForTimeout(3_000);
+      const rows = await page.$$eval('#progress .dl > div:first-child',
+        (els) => els.map((e) => e.textContent));
+      console.log('progress rows:', rows);
+      if (rows.length === 0) { failures++; console.log('FAIL no progress rows'); }
+    } catch {
+      failures++;
+      console.log('FAIL progress rows never appeared');
+    }
+  }
   await page.waitForSelector('#sec-mount:not(.hidden)', { timeout: 300_000 });
   console.log('model + cartridges loaded:', await page.textContent('#status'));
 
@@ -90,9 +112,10 @@ const main = async () => {
       { timeout: 120_000 }
     );
     await mount('#btn-c');
-    report('C London     ', await complete('London, GB | population |'), '8961989');
-    report('C Paris      ', await complete('Paris, FR | population |'), '2138551');
-    report('C Paris again', await complete('Paris, FR | population |'), '2138551');
+    reportExact('C London     ', await complete('London, GB | population |'), '8961989');
+    reportExact('C Paris      ', await complete('Paris, FR | population |'), '2138551');
+    reportExact('C Paris again', await complete('Paris, FR | population |'), '2138551');
+    reportExact('C Nanjing    ', await complete('Nanjing, CN | population |'), '9314685');
     // back to football for the unmounted checks
     await page.click('#ws-football');
     await page.waitForFunction(
