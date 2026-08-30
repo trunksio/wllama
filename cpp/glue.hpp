@@ -664,6 +664,23 @@ struct glue_msg_engram_set_res
   GLUE_FIELD(str, message)
 };
 
+struct glue_msg_engram_signal_req
+{
+  GLUE_HANDLER("engs_req")
+  GLUE_FIELD(bool, reset)
+};
+
+struct glue_msg_engram_signal_res
+{
+  GLUE_HANDLER("engs_res")
+  GLUE_FIELD(bool, success)
+  GLUE_FIELD(float, sig_mean)
+  GLUE_FIELD(float, sig_max)
+  GLUE_FIELD(int, sig_count)
+  GLUE_FIELD(int, trace_stride)
+  GLUE_FIELD(arr_float, trace)
+};
+
 struct glue_msg_test_backend_ops_req
 {
   GLUE_HANDLER("tbop_req")

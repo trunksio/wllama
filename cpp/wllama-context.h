@@ -844,6 +844,41 @@ struct wllama_context
     return res;
   }
 
+  glue_msg_engram_signal_res action_engram_signal(const char *req_raw)
+  {
+    PARSE_REQ(glue_msg_engram_signal_req);
+    glue_msg_engram_signal_res res;
+    if (!ctx)
+    {
+      res.success.value = false;
+      res.sig_mean.value = 0.0f;
+      res.sig_max.value = 0.0f;
+      res.sig_count.value = 0;
+      res.trace_stride.value = 0;
+      return res;
+    }
+    float sig_mean = 0.0f, sig_max = 0.0f;
+    int32_t sig_count = 0;
+    llama_engram_signal(ctx, &sig_mean, &sig_max, &sig_count, false);
+    // most recent 64 positions of the per-order provenance trace
+    int32_t stride = 0;
+    llama_engram_signal_trace(ctx, nullptr, 0, &stride);
+    std::vector<float> trace((size_t) 64 * std::max(stride, 1));
+    const int32_t n_pos = llama_engram_signal_trace(ctx, trace.data(), 64, &stride);
+    trace.resize((size_t) n_pos * stride);
+    if (req.reset.value)
+    {
+      llama_engram_signal(ctx, nullptr, nullptr, nullptr, true);
+    }
+    res.success.value = true;
+    res.sig_mean.value = sig_mean;
+    res.sig_max.value = sig_max;
+    res.sig_count.value = sig_count;
+    res.trace_stride.value = stride;
+    res.trace.arr = std::move(trace);
+    return res;
+  }
+
   glue_msg_test_backend_ops_res action_test_backend_ops(const char *req_raw)
   {
     PARSE_REQ(glue_msg_test_backend_ops_req);

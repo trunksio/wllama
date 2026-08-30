@@ -22,6 +22,7 @@ import type {
   GlueMsgGetResultRes,
   GlueMsgLoadRes,
   GlueMsgEngramSetRes,
+  GlueMsgEngramSignalRes,
   GlueMsgTestBackendOpsRes,
 } from './glue/messages';
 import { LIBLLAMA_VERSION } from './workers-code/generated';
@@ -289,6 +290,36 @@ export class Wllama {
     if (!result.success) {
       throw new WllamaError(result.message, 'load_error');
     }
+  }
+
+  /**
+   * Read the engram confidence signal: L2 norms of the mounted cartridge's
+   * injected residual, accumulated per token since the last reset.
+   *
+   * `trace` holds the most recent positions' per-order norms flattened with
+   * `traceStride` floats per position (one norm per n-gram order, then the
+   * full-residual norm). A stored key fires the high orders; a base-model
+   * guess leaves the memory silent.
+   */
+  async getEngramSignal(opts: { reset?: boolean } = {}): Promise<{
+    mean: number;
+    max: number;
+    count: number;
+    traceStride: number;
+    trace: number[];
+  }> {
+    this.checkModelLoaded();
+    const result: GlueMsgEngramSignalRes = await this.proxy.wllamaAction(
+      'engram_signal',
+      { _name: 'engs_req', reset: opts.reset ?? false }
+    );
+    return {
+      mean: result.sig_mean,
+      max: result.sig_max,
+      count: result.sig_count,
+      traceStride: result.trace_stride,
+      trace: Array.from(result.trace ?? []),
+    };
   }
 
   /**
