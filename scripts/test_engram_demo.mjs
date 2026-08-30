@@ -104,6 +104,21 @@ const main = async () => {
     report(`swap->B     `, await complete(PROMPTS.both.prompt), PROMPTS.both.expectB);
   }
 
+  // provenance badges (pages with the #provenance element only)
+  const readProv = async () => (await page.textContent('#provenance')) ?? '';
+  const provCheck = async (label, prompt, expectSubstr) => {
+    await complete(prompt);
+    const prov = await readProv();
+    const ok = prov.includes(expectSubstr);
+    if (!ok) failures++;
+    console.log(`${ok ? 'OK  ' : 'FAIL'} ${label}: prov='${prov.slice(0, 60)}' expect~'${expectSubstr}'`);
+  };
+  if (await page.$('#provenance')) {
+    await mount('#btn-a');
+    await provCheck('prov stored ', PROMPTS.a.prompt, '✓ stored fact');
+    await provCheck('prov silent ', 'Cambridge v Guiseley | result |', '✗ not in this cartridge');
+  }
+
   // 3b. cities workspace (bare base + cities cartridge), if the page has one
   if (await page.$('#ws-cities')) {
     await page.click('#ws-cities');
@@ -116,6 +131,11 @@ const main = async () => {
     reportExact('C Paris      ', await complete('Paris, FR | population |'), '2138551');
     reportExact('C Paris again', await complete('Paris, FR | population |'), '2138551');
     reportExact('C Nanjing    ', await complete('Nanjing, CN | population |'), '9314685');
+    if (await page.$('#provenance')) {
+      await provCheck('C prov stored', 'London, GB | population |', '✓ stored fact');
+      await provCheck('C prov blend ', 'Guiseley, GB | population |', '⚠ not a stored fact');
+      await provCheck('C prov silent', 'Atlantis, XX | population |', '✗ not in this cartridge');
+    }
     // back to football for the unmounted checks
     await page.click('#ws-football');
     await page.waitForFunction(
