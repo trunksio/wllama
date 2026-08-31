@@ -89,6 +89,9 @@ const main = async () => {
   for (let i = 0; i < 6; i++) {
     report(`A repeat ${i + 1} `, await complete(PROMPTS.a.prompt), PROMPTS.a.expect);
   }
+  // football: repeat after a different prompt without remount
+  report('A other      ', await complete('Arsenal v Chelsea | result |'), null);
+  report('A repeat-diff', await complete(PROMPTS.a.prompt), PROMPTS.a.expect);
 
   // 2. swap to B, repeat-stability
   await mount('#btn-b');
@@ -127,12 +130,19 @@ const main = async () => {
       { timeout: 120_000 }
     );
     await mount('#btn-c');
-    reportExact('C London     ', await complete('London, GB | population |'), '8961989');
+    reportExact('C Manchester ', await complete('Manchester, GB | population |'), '568996');
+    reportExact('C Tokyo      ', await complete('Tokyo, JP | population |'), '9733276');
     reportExact('C Paris      ', await complete('Paris, FR | population |'), '2138551');
     reportExact('C Paris again', await complete('Paris, FR | population |'), '2138551');
     reportExact('C Nanjing    ', await complete('Nanjing, CN | population |'), '9314685');
+    // repeat an earlier prompt AFTER different prompts, no remount between:
+    // a cached-prompt reuse with stale engram history answers with the
+    // previous fact (the live-site 'Paris under Manchester' bug)
+    reportExact('C Manchester2', await complete('Manchester, GB | population |'), '568996');
+    reportExact('C Tokyo2     ', await complete('Tokyo, JP | population |'), '9733276');
     if (await page.$('#provenance')) {
-      await provCheck('C prov stored', 'London, GB | population |', '✓ stored fact');
+      await provCheck('C prov stored', 'Nanjing, CN | population |', '✓ stored fact');
+      await provCheck('C prov k-miss', 'London, GB | population |', '⚠ known audit miss');
       await provCheck('C prov blend ', 'Guiseley, GB | population |', '⚠ not a stored fact');
       await provCheck('C prov silent', 'Atlantis, XX | population |', '✗ not in this cartridge');
     }

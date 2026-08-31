@@ -311,6 +311,17 @@ struct wllama_context
       task.cli_prompt = prompt;
       task.cli_files = files;
       task.cli = true;
+      if (engram)
+      {
+        // an engram hashes suffix windows from a per-sequence token history
+        // that is rebuilt only for tokens actually decoded. Reusing cached
+        // prompt state decodes just the tail, leaving the earlier positions
+        // holding the PREVIOUS request's tokens — windows then hash a mix of
+        // the old prompt and the new suffix, and the memory answers with the
+        // previous fact (or falls silent). Prompts are short; always decode
+        // them in full while a memory is mounted.
+        task.params.cache_prompt = false;
+      }
 
       rd->post_task({std::move(task)});
     }
@@ -639,7 +650,16 @@ struct wllama_context
     PARSE_REQ(glue_msg_completion_req);
     glue_msg_completion_res res;
 
-    // prepare
+    // prepare: if the previous request left a task running or results
+    // undelivered (a client that stopped polling early, a suspended worker,
+    // any timing hiccup), cancel it and purge its results so nothing of it
+    // can be served as this request's answer
+    if (rd && rd->has_next())
+    {
+      LOG_WRN("%s: previous request still pending; cancelling it\n", __func__);
+      rd->stop();
+      ctx_server.start_loop(); // process the cancel task
+    }
     rd = std::make_unique<server_response_reader>(ctx_server.get_response_reader());
     last_error = "";
     std::vector<raw_buffer> input_files;
@@ -1015,13 +1035,35 @@ void server_response::add_waiting_task_ids(const std::unordered_set<int> &id_tas
 
 void server_response::remove_waiting_task_ids(const std::unordered_set<int> &id_tasks)
 {
-  // no-op
+  // purge whatever those tasks still have queued so it can never leak into
+  // a later request (called from server_response_reader::stop)
+  size_t purged = 0;
+  for (size_t i = 0; i < queue_results.size();)
+  {
+    if (id_tasks.count(queue_results[i]->id) > 0)
+    {
+      queue_results.erase(queue_results.begin() + i);
+      purged++;
+    }
+    else
+    {
+      i++;
+    }
+  }
+  if (purged > 0)
+  {
+    LOG_WRN("%s: purged %zu undelivered result(s) of a previous request\n", __func__, purged);
+  }
 }
 
-server_task_result_ptr server_response::recv(const std::unordered_set<int> &)
+server_task_result_ptr server_response::recv(const std::unordered_set<int> &id_tasks)
 {
+  // only hand back results that belong to the asking reader: a stale result
+  // from a previous request must never be delivered as this request's answer
   for (size_t i = 0; i < queue_results.size(); i++)
   {
+    if (id_tasks.count(queue_results[i]->id) == 0)
+      continue;
     server_task_result_ptr res = std::move(queue_results[i]);
     queue_results.erase(queue_results.begin() + i);
     return res;
