@@ -327,6 +327,17 @@ struct wllama_context
       task.cli_files = files;
       task.cli = true;
       task.apply_chat_session(chat_session);
+      if (engram)
+      {
+        // an engram hashes suffix windows from a per-sequence token history
+        // that is rebuilt only for tokens actually decoded. Reusing cached
+        // prompt state decodes just the tail, leaving the earlier positions
+        // holding the PREVIOUS request's tokens — windows then hash a mix of
+        // the old prompt and the new suffix, and the memory answers with the
+        // previous fact (or falls silent). Prompts are short; always decode
+        // them in full while a memory is mounted.
+        task.params.cache_prompt = false;
+      }
 
       std::vector<server_task> tasks;
       tasks.push_back(std::move(task));
