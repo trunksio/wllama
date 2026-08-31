@@ -67,7 +67,7 @@ const main = async () => {
         const info = document.getElementById('mount-info').textContent;
         return !info.includes('mounting') &&
           (info.includes('mounted in') || info.includes('Unmounted in'));
-      },
+      }, null,
       { timeout: 120_000 }
     );
     console.log('  mount:', await page.textContent('#mount-info'));
@@ -77,7 +77,7 @@ const main = async () => {
     await page.fill('#prompt', prompt);
     await page.click('#btn-run');
     await page.waitForFunction(
-      () => !document.getElementById('btn-run').disabled,
+      () => !document.getElementById('btn-run').disabled, null,
       { timeout: 120_000 }
     );
     const full = await page.textContent('#output');
@@ -126,7 +126,7 @@ const main = async () => {
   if (await page.$('#ws-cities')) {
     await page.click('#ws-cities');
     await page.waitForFunction(
-      () => document.getElementById('status').textContent.includes('Cities workspace ready'),
+      () => document.getElementById('status').textContent.includes('Cities workspace ready'), null,
       { timeout: 120_000 }
     );
     await mount('#btn-c');
@@ -149,7 +149,7 @@ const main = async () => {
     // back to football for the unmounted checks
     await page.click('#ws-football');
     await page.waitForFunction(
-      () => document.getElementById('status').textContent.includes('Football workspace ready'),
+      () => document.getElementById('status').textContent.includes('Football workspace ready'), null,
       { timeout: 120_000 }
     );
   }
