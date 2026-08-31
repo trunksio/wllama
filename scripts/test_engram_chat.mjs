@@ -41,10 +41,10 @@ const main = async () => {
     await page.waitForFunction(() => !document.getElementById('btn-send').disabled, null, { timeout: 300_000 });
     const last = await page.$('#chat-log .msg.assistant:last-of-type');
     const text = (await last.textContent()) ?? '';
-    const key = await last.$eval('.lookup .key', (e) => e.textContent).catch(() => '');
-    const value = await last.$eval('.lookup .value', (e) => e.textContent).catch(() => '');
+    const keys = await last.$$eval('.lookup .key', (es) => es.map((e) => e.textContent)).catch(() => []);
+    const values = await last.$$eval('.lookup .value', (es) => es.map((e) => e.textContent)).catch(() => []);
     const prov = await last.$eval('.lookup .prov', (e) => e.textContent).catch(() => '');
-    return { text, key, value, prov };
+    return { text, key: keys[0] ?? '', value: values[0] ?? '', keys, values, prov };
   };
 
   // cities memory mounted
@@ -67,8 +67,9 @@ const main = async () => {
   // football memory
   await mount('#btn-chat-a');
   r = await ask('who won Newcastle against Liverpool?');
-  check('football key  ', r.key.startsWith('Newcastle v Liverpool | result |'), `key='${r.key}'`);
-  check('football value', r.value.includes('2-3 (Liverpool)'), `value='${r.value}'`);
+  const pairs = r.keys.map((k, i) => `${k} ${r.values[i]}`);
+  check('football legs ', pairs.some((p) => p.startsWith('Newcastle v Liverpool | result |') && p.includes('2-3 (Liverpool)')), `pairs=${JSON.stringify(pairs)}`);
+  check('football prose', /Liverpool/.test(r.text) && /2-3|4-1/.test(r.text), `text='${r.text.slice(-120).trim()}'`);
 
   await browser.close();
   console.log(failures === 0 ? '\nALL PASS' : `\n${failures} FAILURES`);
