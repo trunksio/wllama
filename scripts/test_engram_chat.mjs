@@ -24,7 +24,7 @@ const main = async () => {
 
   await page.click('#ws-chat');
   await page.waitForFunction(
-    () => document.getElementById('status').textContent.includes('Chat workspace ready'),
+    () => document.getElementById('status').textContent.includes('Chat workspace ready'), null,
     { timeout: 900_000 });
   console.log('chat ready:', await page.textContent('#status'));
 
@@ -33,12 +33,12 @@ const main = async () => {
     await page.waitForFunction(() => {
       const t = document.getElementById('mount-info').textContent;
       return !t.includes('mounting') && (t.includes('mounted in') || t.includes('Unmounted in'));
-    }, { timeout: 300_000 });
+    }, null, { timeout: 300_000 });
   };
   const ask = async (q) => {
     await page.fill('#chat-input', q);
     await page.click('#btn-send');
-    await page.waitForFunction(() => !document.getElementById('btn-send').disabled, { timeout: 300_000 });
+    await page.waitForFunction(() => !document.getElementById('btn-send').disabled, null, { timeout: 300_000 });
     const last = await page.$('#chat-log .msg.assistant:last-of-type');
     const text = (await last.textContent()) ?? '';
     const key = await last.$eval('.lookup .key', (e) => e.textContent).catch(() => '');

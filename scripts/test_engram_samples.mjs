@@ -29,13 +29,13 @@ const main = async () => {
 
   await page.click('#ws-cities');
   await page.waitForFunction(
-    () => document.getElementById('status').textContent.includes('Cities workspace ready'),
+    () => document.getElementById('status').textContent.includes('Cities workspace ready'), null,
     { timeout: 300_000 });
   await page.click('#btn-c');
   await page.waitForFunction(() => {
     const t = document.getElementById('mount-info').textContent;
     return t.includes('mounted in');
-  }, { timeout: 300_000 });
+  }, null, { timeout: 300_000 });
   console.log('mounted:', await page.textContent('#mount-info'));
 
   const samples = await page.$$('#samples button');
@@ -46,7 +46,7 @@ const main = async () => {
     const text = await buttons[i].textContent();
     await buttons[i].click();
     await page.click('#btn-run');
-    await page.waitForFunction(() => !document.getElementById('btn-run').disabled, { timeout: 300_000 });
+    await page.waitForFunction(() => !document.getElementById('btn-run').disabled, null, { timeout: 300_000 });
     const out = await page.textContent('#output');
     const check = await page.textContent('#answer-check');
     const prov = await page.textContent('#provenance');
