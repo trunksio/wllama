@@ -740,7 +740,14 @@ struct wllama_context
       server_task task = server_task(SERVER_TASK_TYPE_EMBEDDING);
       task.id = rd.get_new_id();
       task.tokens = std::move(tokenized_prompts[i]);
-      task.params.res_type = TASK_RESPONSE_TYPE_OAI_EMBD;
+      // per_token: emit the FULL [n_tokens][n_embd] matrix (native, non-OAI
+      // format) instead of a single pooled/first vector — for a pointer-head
+      // decision model reading per-token hidden states. Requires the model to
+      // be loaded with pooling_type NONE, which also yields raw, un-normalised
+      // states (see server-context send_embedding).
+      task.params.res_type = body.value("per_token", false)
+                                 ? TASK_RESPONSE_TYPE_NONE
+                                 : TASK_RESPONSE_TYPE_OAI_EMBD;
       task.params.embd_normalize = embd_normalize;
       tasks.push_back(std::move(task));
     }
