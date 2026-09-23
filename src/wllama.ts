@@ -755,6 +755,51 @@ export class Wllama {
   }
 
   /**
+   * Per-token hidden states for a prompt: the full [n_tokens][n_embd] matrix
+   * (raw, un-normalised) instead of a single pooled/first vector. For a
+   * pointer-head decision model that reads each token's final-layer state.
+   *
+   * Requires the model to be loaded with `embeddings: true` and
+   * `pooling_type: 'none'` (which is what yields raw per-token states).
+   * @param input the text to embed
+   * @returns rows of n_embd floats, one per input token
+   */
+  async getTokenEmbeddings(input: string): Promise<number[][]> {
+    this.checkModelLoaded();
+    if (!this.useEmbeddings) {
+      throw new WllamaError(
+        'Embeddings is not enabled. Please set it via LoadModelParams.embeddings'
+      );
+    }
+    // per_token + no normalisation; read by the C++ create_embedding_tasks.
+    const options = { input, per_token: true, embd_normalize: -1 };
+    const result = await this.proxy.wllamaAction<GlueMsgEmbeddingRes>(
+      'embedding',
+      {
+        _name: 'embd_req',
+        data_json: JSON.stringify(options),
+        files: [],
+      }
+    );
+    if (!result.success) {
+      throw new WllamaError(
+        'Model failed to start inference',
+        'inference_error'
+      );
+    }
+    const resp = await this.getResponse(options as any, false);
+    const matrix = (resp as { data?: { embedding?: unknown }[] })?.data?.[0]
+      ?.embedding;
+    if (!Array.isArray(matrix) || !Array.isArray(matrix[0])) {
+      throw new WllamaError(
+        'per-token embeddings not returned as a matrix — load the model with pooling_type: "none"',
+        'inference_error'
+      );
+    }
+    return matrix as number[][];
+  }
+
+  /**
    * Rerank a list of documents against a query.
    * Requires the model to be loaded with embeddings: true and pooling_type: 'rank'.
    * @param options Reranking options (query, documents, top_n)
