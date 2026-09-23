@@ -456,7 +456,13 @@ struct wllama_context
     if (req.embeddings.not_null())
       params.embedding = req.embeddings.value;
     if (req.n_batch.not_null())
+    {
       params.n_batch = req.n_batch.value;
+      // Keep the physical batch (ubatch) in step with the logical batch, so a
+      // single embedding forward over a long prompt (pooling=none, pointer-head
+      // decision models) isn't capped at the 512 default and rejected.
+      params.n_ubatch = req.n_batch.value;
+    }
     if (req.n_ubatch.not_null())
       params.n_ubatch = req.n_ubatch.value;
     if (req.n_parallel.not_null())
@@ -765,6 +771,20 @@ struct wllama_context
 
     res.success.value = true;
     res.req_id.value = register_reader(std::move(rd));
+    return res;
+  }
+
+  // Tokenize text to token ids, using the SAME path as create_embedding_tasks
+  // (add_special + parse_special), so the ids line up 1:1 with the per-token
+  // matrix from a getTokenEmbeddings call on the same text — letting a caller
+  // locate special-token positions (e.g. a pointer head's option markers).
+  glue_msg_tokenize_res action_tokenize(const char *req_raw)
+  {
+    PARSE_REQ(glue_msg_tokenize_req);
+    glue_msg_tokenize_res res;
+    auto prompts = tokenize_input_prompts(vocab, nullptr, json(req.text.value), true, true);
+    res.tokens.arr = prompts[0].get_text_tokens();
+    res.success.value = true;
     return res;
   }
 

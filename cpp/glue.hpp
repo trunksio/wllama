@@ -623,6 +623,21 @@ struct glue_msg_embedding_res
 
 /////////
 
+struct glue_msg_tokenize_req
+{
+  GLUE_HANDLER("tokn_req")
+  GLUE_FIELD(str, text)
+};
+
+struct glue_msg_tokenize_res
+{
+  GLUE_HANDLER("tokn_res")
+  GLUE_FIELD(bool, success)
+  GLUE_FIELD(arr_int, tokens)
+};
+
+/////////
+
 struct glue_msg_rerank_req
 {
   GLUE_HANDLER("rrnk_req")
