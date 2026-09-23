@@ -18,6 +18,7 @@ import { ModelManager, Model, type ModelSource } from './model-manager';
 import type {
   GlueMsgCompletionRes,
   GlueMsgEmbeddingRes,
+  GlueMsgTokenizeRes,
   GlueMsgRerankRes,
   GlueMsgGetResultRes,
   GlueMsgLoadRes,
@@ -797,6 +798,24 @@ export class Wllama {
       );
     }
     return matrix as number[][];
+  }
+
+  /**
+   * Tokenize text to token ids, using the same path as the embedding call
+   * (add_special + parse_special), so the ids align 1:1 with the rows from
+   * getTokenEmbeddings on the same text — letting a caller find special-token
+   * positions (e.g. a pointer head's option/decide markers).
+   */
+  async tokenize(text: string): Promise<number[]> {
+    this.checkModelLoaded();
+    const r = await this.proxy.wllamaAction<GlueMsgTokenizeRes>('tokenize', {
+      _name: 'tokn_req',
+      text,
+    });
+    if (!r.success) {
+      throw new WllamaError('Failed to tokenize', 'inference_error');
+    }
+    return r.tokens;
   }
 
   /**

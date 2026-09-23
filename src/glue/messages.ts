@@ -520,6 +520,35 @@ export const GLUE_MESSAGE_PROTOTYPES: { [name: string]: GlueMessageProto } = {
       }
     ]
   },
+  "tokn_req": {
+    "name": "tokn_req",
+    "structName": "glue_msg_tokenize_req",
+    "className": "GlueMsgTokenizeReq",
+    "fields": [
+      {
+        "type": "str",
+        "name": "text",
+        "isNullable": false
+      }
+    ]
+  },
+  "tokn_res": {
+    "name": "tokn_res",
+    "structName": "glue_msg_tokenize_res",
+    "className": "GlueMsgTokenizeRes",
+    "fields": [
+      {
+        "type": "bool",
+        "name": "success",
+        "isNullable": false
+      },
+      {
+        "type": "arr_int",
+        "name": "tokens",
+        "isNullable": false
+      }
+    ]
+  },
   "rrnk_req": {
     "name": "rrnk_req",
     "structName": "glue_msg_rerank_req",
@@ -814,6 +843,19 @@ export interface GlueMsgEmbeddingRes {
   success: boolean;
 }
 
+// struct glue_msg_tokenize_req
+export interface GlueMsgTokenizeReq {
+  _name: "tokn_req";
+  text: string;
+}
+
+// struct glue_msg_tokenize_res
+export interface GlueMsgTokenizeRes {
+  _name: "tokn_res";
+  success: boolean;
+  tokens: number[];
+}
+
 // struct glue_msg_rerank_req
 export interface GlueMsgRerankReq {
   _name: "rrnk_req";
@@ -884,4 +926,4 @@ export interface GlueMsgTestBackendOpsRes {
 }
 
 
-export type GlueMsg = GlueMsgError | GlueMsgLoadReq | GlueMsgLoadRes | GlueMsgCompletionReq | GlueMsgCompletionRes | GlueMsgEmbeddingReq | GlueMsgEmbeddingRes | GlueMsgRerankReq | GlueMsgRerankRes | GlueMsgGetResultReq | GlueMsgGetResultRes | GlueMsgEngramSetReq | GlueMsgEngramSetRes | GlueMsgEngramSignalReq | GlueMsgEngramSignalRes | GlueMsgTestBackendOpsReq | GlueMsgTestBackendOpsRes;
+export type GlueMsg = GlueMsgError | GlueMsgLoadReq | GlueMsgLoadRes | GlueMsgCompletionReq | GlueMsgCompletionRes | GlueMsgEmbeddingReq | GlueMsgEmbeddingRes | GlueMsgTokenizeReq | GlueMsgTokenizeRes | GlueMsgRerankReq | GlueMsgRerankRes | GlueMsgGetResultReq | GlueMsgGetResultRes | GlueMsgEngramSetReq | GlueMsgEngramSetRes | GlueMsgEngramSignalReq | GlueMsgEngramSignalRes | GlueMsgTestBackendOpsReq | GlueMsgTestBackendOpsRes;
