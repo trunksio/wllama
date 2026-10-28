@@ -270,6 +270,11 @@ export const GLUE_MESSAGE_PROTOTYPES: { [name: string]: GlueMessageProto } = {
       },
       {
         "type": "str",
+        "name": "engram_path",
+        "isNullable": true
+      },
+      {
+        "type": "str",
         "name": "spec_draft_model",
         "isNullable": true
       },
@@ -525,6 +530,35 @@ export const GLUE_MESSAGE_PROTOTYPES: { [name: string]: GlueMessageProto } = {
       }
     ]
   },
+  "tokn_req": {
+    "name": "tokn_req",
+    "structName": "glue_msg_tokenize_req",
+    "className": "GlueMsgTokenizeReq",
+    "fields": [
+      {
+        "type": "str",
+        "name": "text",
+        "isNullable": false
+      }
+    ]
+  },
+  "tokn_res": {
+    "name": "tokn_res",
+    "structName": "glue_msg_tokenize_res",
+    "className": "GlueMsgTokenizeRes",
+    "fields": [
+      {
+        "type": "bool",
+        "name": "success",
+        "isNullable": false
+      },
+      {
+        "type": "arr_int",
+        "name": "tokens",
+        "isNullable": false
+      }
+    ]
+  },
   "rrnk_req": {
     "name": "rrnk_req",
     "structName": "glue_msg_rerank_req",
@@ -646,6 +680,84 @@ export const GLUE_MESSAGE_PROTOTYPES: { [name: string]: GlueMessageProto } = {
       }
     ]
   },
+  "engr_req": {
+    "name": "engr_req",
+    "structName": "glue_msg_engram_set_req",
+    "className": "GlueMsgEngramSetReq",
+    "fields": [
+      {
+        "type": "str",
+        "name": "path",
+        "isNullable": true
+      }
+    ]
+  },
+  "engr_res": {
+    "name": "engr_res",
+    "structName": "glue_msg_engram_set_res",
+    "className": "GlueMsgEngramSetRes",
+    "fields": [
+      {
+        "type": "bool",
+        "name": "success",
+        "isNullable": false
+      },
+      {
+        "type": "str",
+        "name": "message",
+        "isNullable": false
+      }
+    ]
+  },
+  "engs_req": {
+    "name": "engs_req",
+    "structName": "glue_msg_engram_signal_req",
+    "className": "GlueMsgEngramSignalReq",
+    "fields": [
+      {
+        "type": "bool",
+        "name": "reset",
+        "isNullable": false
+      }
+    ]
+  },
+  "engs_res": {
+    "name": "engs_res",
+    "structName": "glue_msg_engram_signal_res",
+    "className": "GlueMsgEngramSignalRes",
+    "fields": [
+      {
+        "type": "bool",
+        "name": "success",
+        "isNullable": false
+      },
+      {
+        "type": "float",
+        "name": "sig_mean",
+        "isNullable": false
+      },
+      {
+        "type": "float",
+        "name": "sig_max",
+        "isNullable": false
+      },
+      {
+        "type": "int",
+        "name": "sig_count",
+        "isNullable": false
+      },
+      {
+        "type": "int",
+        "name": "trace_stride",
+        "isNullable": false
+      },
+      {
+        "type": "arr_float",
+        "name": "trace",
+        "isNullable": false
+      }
+    ]
+  },
   "tbop_req": {
     "name": "tbop_req",
     "structName": "glue_msg_test_backend_ops_req",
@@ -735,6 +847,7 @@ export interface GlueMsgLoadReq {
   lora_paths?: string[] | undefined;
   lora_scales?: number[] | undefined;
   lora_init_without_apply?: boolean | undefined;
+  engram_path?: string | undefined;
   spec_draft_model?: string | undefined;
   spec_draft_ngl?: number | undefined;
   spec_draft_n_max?: number | undefined;
@@ -806,6 +919,19 @@ export interface GlueMsgEmbeddingRes {
   req_id: number;
 }
 
+// struct glue_msg_tokenize_req
+export interface GlueMsgTokenizeReq {
+  _name: "tokn_req";
+  text: string;
+}
+
+// struct glue_msg_tokenize_res
+export interface GlueMsgTokenizeRes {
+  _name: "tokn_res";
+  success: boolean;
+  tokens: number[];
+}
+
 // struct glue_msg_rerank_req
 export interface GlueMsgRerankReq {
   _name: "rrnk_req";
@@ -859,6 +985,36 @@ export interface GlueMsgCancelRes {
   success: boolean;
 }
 
+// struct glue_msg_engram_set_req
+export interface GlueMsgEngramSetReq {
+  _name: "engr_req";
+  path?: string | undefined;
+}
+
+// struct glue_msg_engram_set_res
+export interface GlueMsgEngramSetRes {
+  _name: "engr_res";
+  success: boolean;
+  message: string;
+}
+
+// struct glue_msg_engram_signal_req
+export interface GlueMsgEngramSignalReq {
+  _name: "engs_req";
+  reset: boolean;
+}
+
+// struct glue_msg_engram_signal_res
+export interface GlueMsgEngramSignalRes {
+  _name: "engs_res";
+  success: boolean;
+  sig_mean: number;
+  sig_max: number;
+  sig_count: number;
+  trace_stride: number;
+  trace: number[];
+}
+
 // struct glue_msg_test_backend_ops_req
 export interface GlueMsgTestBackendOpsReq {
   _name: "tbop_req";
@@ -873,4 +1029,4 @@ export interface GlueMsgTestBackendOpsRes {
 }
 
 
-export type GlueMsg = GlueMsgError | GlueMsgLoadReq | GlueMsgLoadRes | GlueMsgCompletionReq | GlueMsgCompletionRes | GlueMsgEmbeddingReq | GlueMsgEmbeddingRes | GlueMsgRerankReq | GlueMsgRerankRes | GlueMsgSystemoneReq | GlueMsgSystemoneRes | GlueMsgGetResultReq | GlueMsgGetResultRes | GlueMsgCancelReq | GlueMsgCancelRes | GlueMsgTestBackendOpsReq | GlueMsgTestBackendOpsRes;
+export type GlueMsg = GlueMsgError | GlueMsgLoadReq | GlueMsgLoadRes | GlueMsgCompletionReq | GlueMsgCompletionRes | GlueMsgEmbeddingReq | GlueMsgEmbeddingRes | GlueMsgTokenizeReq | GlueMsgTokenizeRes | GlueMsgRerankReq | GlueMsgRerankRes | GlueMsgSystemoneReq | GlueMsgSystemoneRes | GlueMsgGetResultReq | GlueMsgGetResultRes | GlueMsgCancelReq | GlueMsgCancelRes | GlueMsgEngramSetReq | GlueMsgEngramSetRes | GlueMsgEngramSignalReq | GlueMsgEngramSignalRes | GlueMsgTestBackendOpsReq | GlueMsgTestBackendOpsRes;

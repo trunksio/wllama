@@ -798,7 +798,7 @@ export class Wllama {
         'inference_error'
       );
     }
-    const resp = await this.getResponse(options as any, false);
+    const resp = await this.getResponse(options as any, false, result.req_id);
     const matrix = (resp as { data?: { embedding?: unknown }[] })?.data?.[0]
       ?.embedding;
     if (!Array.isArray(matrix) || !Array.isArray(matrix[0])) {
