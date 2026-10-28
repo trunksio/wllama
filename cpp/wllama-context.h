@@ -782,7 +782,7 @@ struct wllama_context
   {
     PARSE_REQ(glue_msg_tokenize_req);
     glue_msg_tokenize_res res;
-    auto prompts = tokenize_input_prompts(vocab, nullptr, json(req.text.value), true, true);
+    auto prompts = tokenize_input_prompts(vocab, nullptr, json(req.text.value), true, true, mtmd_helper_init_opt_default());
     res.tokens.arr = prompts[0].get_text_tokens();
     res.success.value = true;
     return res;
@@ -807,7 +807,7 @@ struct wllama_context
 
     auto rd = std::make_unique<server_response_reader>(ctx_server.get_response_reader());
 
-    auto tokens = format_prompt_rerank(model, vocab, nullptr, query, document, mtmd_helper_init_opt_default());
+    auto tokens = format_prompt_rerank(model, vocab, nullptr, query, document, {}, {}, mtmd_helper_init_opt_default());
     server_task task = server_task(SERVER_TASK_TYPE_RERANK);
     task.id = rd->get_new_id();
     task.index = 0;
