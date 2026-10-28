@@ -38,6 +38,13 @@ const toSizeT = (num) => {
   return isCompat ? Number(num) : BigInt(num);
 };
 
+// Heap offset from a wasm pointer. wasm64 hands back a BigInt; the compat
+// (wasm32) build hands back a SIGNED i32, so any address past 2 GB arrives
+// negative and every typed-array view over it throws. Read it unsigned.
+const toOffset = (ptr) => {
+  return typeof ptr === 'bigint' ? Number(ptr) : ptr >>> 0;
+};
+
 // Get module config that forwards stdout/err to main thread
 const getWModuleConfig = (_argMainScriptBlob) => {
   var pathConfig = RUN_OPTIONS.pathConfig;
@@ -181,7 +188,7 @@ const patchHeapFS = () => {
     const name = stream.node.name;
     if (fsNameToFile[name]) {
       const f = fsNameToFile[name];
-      const ptr = Number(f.ptr);
+      const ptr = toOffset(f.ptr);
       stream.node.contents = getHeapU8().subarray(ptr, ptr + f.size);
       stream.node.usedBytes = f.size;
     }
@@ -256,7 +263,7 @@ const heapfsWrite = (id, buffer, offset) => {
         `File ID ${id} write out of bound, afterWriteByte = ${afterWriteByte} while size = ${size}`
       );
     }
-    getHeapU8().set(buffer, Number(ptr) + offset);
+    getHeapU8().set(buffer, toOffset(ptr) + offset);
     return buffer.byteLength;
   } else {
     throw new Error(`File ID ${id} not found in heapfs`);
@@ -366,7 +373,7 @@ const runAction = async (data) => {
     // copy data to wasm heap
     const inputBuffer = new Uint8Array(
       getHeapU8().buffer,
-      Number(inputPtr),
+      toOffset(inputPtr),
       argEncodedMsg.byteLength
     );
     inputBuffer.set(argEncodedMsg, 0);
@@ -374,14 +381,14 @@ const runAction = async (data) => {
     // length of output buffer is written at the first 4 bytes of input buffer
     const outputLen = new Uint32Array(
       getHeapU8().buffer,
-      Number(inputPtr),
+      toOffset(inputPtr),
       1
     )[0];
     // copy the output buffer to JS heap
     const outputBuffer = new Uint8Array(outputLen);
     const outputSrcView = new Uint8Array(
       getHeapU8().buffer,
-      Number(outputPtr),
+      toOffset(outputPtr),
       outputLen
     );
     outputBuffer.set(outputSrcView, 0); // copy it
